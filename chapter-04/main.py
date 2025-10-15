@@ -1,18 +1,37 @@
 import uvicorn
-from fastapi import FastAPI
-
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 app = FastAPI()
 
 stack = list()
 
-@app.get('/get_request')
-def get_request():
+class PutElement(BaseModel):
+    value: int
+
+
+@app.get('/pop')
+def pop_element():
+    if not stack:
+        raise HTTPException(status_code=404, detail="No elements in stack")
+    
     return {"message": f"The last value is {stack.pop()}"}
 
-@app.post('/post_request')
-def post_request(input: int):
-    stack.append(input)
-    return {"message": f"{input} is added"}
+@app.post('/push')
+def push_element(input: PutElement):
+    stack.append(input.value)
+    return {"message": f"{input.value} is added"}
+
+@app.get('/size')
+def get_stack_size():
+    return {
+        "stack_size": len(stack),
+        "is_empty": len(stack) == 0
+    }
+
+@app.delete('/clear')
+def clear_stack():
+    stack.clear()
+    return {"message": "Стек очищен"}
 
 if __name__ == "__main__":
     uvicorn.run(app)
