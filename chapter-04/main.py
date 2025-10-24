@@ -1,11 +1,13 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+
 app = FastAPI()
 
 stack = list()
 
-class PutElement(BaseModel):
+class PushElement(BaseModel):
     value: int
 
 
@@ -17,7 +19,7 @@ def pop_element():
     return {"message": f"The last value is {stack.pop()}"}
 
 @app.post('/push')
-def push_element(input: PutElement):
+def push_element(input: PushElement):
     stack.append(input.value)
     return {"message": f"{input.value} is added"}
 
