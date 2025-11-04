@@ -12,19 +12,19 @@ class PushElement(BaseModel):
 
 
 @app.get('/pop')
-def pop_element():
+async def pop_element():
     if not stack:
         raise HTTPException(status_code=404, detail="No elements in stack")
     
     return {"message": f"The last value is {stack.pop()}"}
 
 @app.post('/push')
-def push_element(input: PushElement):
+async def push_element(input: PushElement):
     stack.append(input.value)
     return {"message": f"{input.value} is added"}
 
 @app.get('/size')
-def get_stack_size():
+async def get_stack_size():
     return {
         "stack_size": len(stack),
         "is_empty": len(stack) == 0
