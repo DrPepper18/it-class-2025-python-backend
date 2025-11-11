@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Симуляция стека{% endblock %}
+
+{% block content %}
+<h1>Симуляция стека</h1>
+
+<div>
+    <h3>Добавить элемент (Push)</h3>
+    <input type="number" id="pushValue" placeholder="Введите число">
+    <button onclick="pushElement()">Добавить</button>
+</div>
+
+<div>
+    <h3>Удалить элемент (Pop)</h3>
+    <button onclick="popElement()">Удалить последний</button>
+</div>
+
+<div>
+    <h3>Размер стека (Size)</h3>
+    <button onclick="getStackSize()">Показать размер</button>
+</div>
+
+<div>
+    <h3>Очистить стек (Clear)</h3>
+    <button onclick="clearStack()">Очистить</button>
+</div>
+
+<div id="result">Результат операции появится здесь</div>
+
+<script>
+    const API_BASE = '/services';
+
+    function showResult(message) {
+        document.getElementById('result').textContent = message;
+    }
+
+    async function pushElement() {
+        const value = document.getElementById('pushValue').value;
+        
+        if (!value) {
+            showResult('Ошибка: введите число');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/push`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: parseInt(value) })
+            });
+            
+            const data = await response.json();
+            showResult(data.message);
+            document.getElementById('pushValue').value = '';
+        } catch (error) {
+            showResult('Ошибка: ' + error.message);
+        }
+    }
+
+    async function popElement() {
+        try {
+            const response = await fetch(`${API_BASE}/pop`);
+            const data = await response.json();
+            showResult(data.message);
+        } catch (error) {
+            showResult('Ошибка: ' + error.message);
+        }
+    }
+
+    async function getStackSize() {
+        try {
+            const response = await fetch(`${API_BASE}/size`);
+            const data = await response.json();
+            showResult(`Размер стека: ${data.stack_size}, Пуст: ${data.is_empty ? 'Да' : 'Нет'}`);
+        } catch (error) {
+            showResult('Ошибка: ' + error.message);
+        }
+    }
+
+    async function clearStack() {
+        if (confirm('Очистить весь стек?')) {
+            try {
+                const response = await fetch(`${API_BASE}/clear`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                showResult(data.message);
+            } catch (error) {
+                showResult('Ошибка: ' + error.message);
+            }
+        }
+    }
+</script>
+{% endblock %}
