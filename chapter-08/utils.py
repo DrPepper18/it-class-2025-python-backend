@@ -1,4 +1,6 @@
 import sqlite3
+import hashlib
+import secrets
 
 # Инициализация базы данных
 def init_db():

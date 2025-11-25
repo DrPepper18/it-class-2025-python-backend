@@ -1,8 +1,7 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-import hashlib
-import secrets
+
 from utils import *
 
 app = FastAPI()
