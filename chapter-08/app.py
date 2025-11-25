@@ -52,11 +52,7 @@ async def register(user: UserLogin):
 @app.get('/users')
 async def get_users():
     """Получить список всех пользователей (для демонстрации)"""
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, username FROM users")
-    users = cursor.fetchall()
-    conn.close()
+    users = get_all_users()
     
     return {"users": [{"id": u[0], "username": u[1]} for u in users]}
 
