@@ -93,3 +93,12 @@ def register_user(username: str, password: str):
     
     conn.close()
     return success
+
+
+def get_all_users():
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username FROM users")
+    users = cursor.fetchall()
+    conn.close()
+    return users
