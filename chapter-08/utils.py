@@ -135,6 +135,31 @@ def vulnerable_login(username: str, password: str):
         return True
     return False
 
+
+def demonstrate_hash_irreversibility():
+    """Демонстрация необратимости хэшей"""
+    passwords = [
+        "password123",
+        "password124",
+        "hello world", 
+        "Привет123!"
+    ]
+    
+    results = []
+    for pwd in passwords:
+        hash_obj = hashlib.sha256(pwd.encode('utf-8'))
+        hash_hex = hash_obj.hexdigest()
+        
+        results.append({
+            "password": pwd,
+            "hash": hash_hex[:32] + "...",
+            "input_length": len(pwd),
+            "hash_length": len(hash_hex)
+        })
+    
+    return results
+
+
 # Функции для демонстрации хэширования с bcrypt
 def demonstrate_bcrypt_slowness():
     """Демонстрация медленной работы bcrypt"""
@@ -233,3 +258,4 @@ def compare_hashing_algorithms():
             "security": "БЕЗОПАСНО для паролей"
         }
     }
+
