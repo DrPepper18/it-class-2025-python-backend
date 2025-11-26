@@ -1,90 +1,103 @@
 import sqlite3
-import hashlib
 import secrets
+import jwt
+from datetime import datetime, timedelta
+from typing import Optional
+from fastapi import HTTPException
+import bcrypt
+
+# Секретный ключ для JWT (в реальном приложении хранить в env переменных)
+JWT_SECRET = "your-secret-key-change-in-production"
+JWT_ALGORITHM = "HS256"
 
 # Инициализация базы данных
 def init_db():
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
     
-    # Создаем таблицу пользователей
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            salt TEXT NOT NULL
+            password_hash TEXT NOT NULL
         )
     ''')
     
-    # Добавляем тестового пользователя
     try:
-        salt = secrets.token_hex(16)
-        password_hash = hashlib.sha256(('password123' + salt).encode()).hexdigest()
+        # Хэшируем пароль с помощью bcrypt
+        password_hash = bcrypt.hashpw('password123'.encode('utf-8'), bcrypt.gensalt())
         cursor.execute(
-            "INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?)",
-            ('admin', password_hash, salt)
+            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+            ('admin', password_hash)
         )
     except sqlite3.IntegrityError:
-        pass  # Пользователь уже существует
+        pass
     
     conn.commit()
     conn.close()
 
-# Уязвимая функция для демонстрации SQL-инъекции
-def vulnerable_login(username: str, password: str):
-    """НЕБЕЗОПАСНО: уязвимый метод с SQL-инъекцией"""
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
+# JWT функции
+def create_jwt_token(username: str, expires_delta: Optional[timedelta] = None):
+    """Создание JWT токена"""
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(hours=24)
     
-    # ОПАСНО: прямое склеивание строк!
-    query = f"SELECT * FROM users WHERE username = '{username}' AND password_hash = '{password}'"
-    print(f"🚨 Выполняется уязвимый запрос: {query}")
+    payload = {
+        "sub": username,
+        "exp": expire,
+        "iat": datetime.utcnow()
+    }
     
-    cursor.execute(query)
-    result = cursor.fetchone()
-    conn.close()
-    
-    return result is not None
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return token
 
-# Безопасная функция с параметризованными запросами
+def verify_jwt_token(token: str):
+    """Проверка JWT токена"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        return {"username": username}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Токен истек")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+
+# Функции для работы с пользователями (с bcrypt)
 def safe_login(username: str, password: str):
-    """БЕЗОПАСНО: защищенный метод с параметризованными запросами"""
+    """Безопасный вход с проверкой пароля через bcrypt"""
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
     
-    # БЕЗОПАСНО: параметризованные запросы
-    cursor.execute("SELECT salt FROM users WHERE username = ?", (username,))
+    cursor.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
     result = cursor.fetchone()
     
     if not result:
         return False
     
-    salt = result[0]
-    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+    stored_hash = result[0]
     
-    cursor.execute(
-        "SELECT * FROM users WHERE username = ? AND password_hash = ?",
-        (username, password_hash)
-    )
-    result = cursor.fetchone()
+    # bcrypt автоматически проверяет пароль и соль
+    is_valid = bcrypt.checkpw(password.encode('utf-8'), stored_hash)
+    
     conn.close()
-    
-    return result is not None
+    return is_valid
 
-# Функция для регистрации новых пользователей
 def register_user(username: str, password: str):
-    """Безопасная регистрация пользователя"""
+    """Регистрация нового пользователя с bcrypt"""
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
     
-    salt = secrets.token_hex(16)
-    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+    # bcrypt автоматически генерирует соль и хэширует пароль
+    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     
     try:
         cursor.execute(
-            "INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?)",
-            (username, password_hash, salt)
+            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+            (username, password_hash)
         )
         conn.commit()
         success = True
@@ -94,11 +107,129 @@ def register_user(username: str, password: str):
     conn.close()
     return success
 
-
 def get_all_users():
+    """Получить всех пользователей"""
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
     cursor.execute("SELECT id, username FROM users")
     users = cursor.fetchall()
     conn.close()
     return users
+
+# Уязвимые функции для демонстрации SQL-инъекций
+def vulnerable_login(username: str, password: str):
+    """НЕБЕЗОПАСНО: уязвимый метод с SQL-инъекцией"""
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    
+    # ОПАСНО: прямое склеивание строк!
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    print(f"Выполняется уязвимый запрос: {query}")
+    
+    cursor.execute(query)
+    result = cursor.fetchone()
+    conn.close()
+    
+    if result:
+        # Эмулируем "проверку пароля" - в реальности это было бы небезопасно
+        return True
+    return False
+
+# Функции для демонстрации хэширования с bcrypt
+def demonstrate_bcrypt_slowness():
+    """Демонстрация медленной работы bcrypt"""
+    import time
+    
+    passwords = ["password123", "simple", "complex_P@ssw0rd!"]
+    
+    results = []
+    for pwd in passwords:
+        start_time = time.time()
+        
+        # Хэширование с bcrypt
+        hash_start = time.time()
+        hashed = bcrypt.hashpw(pwd.encode('utf-8'), bcrypt.gensalt())
+        hash_time = time.time() - hash_start
+        
+        # Проверка пароля
+        check_start = time.time()
+        bcrypt.checkpw(pwd.encode('utf-8'), hashed)
+        check_time = time.time() - check_start
+        
+        results.append({
+            "password": pwd,
+            "hash": hashed.decode('utf-8'),
+            "hash_time_seconds": round(hash_time, 4),
+            "check_time_seconds": round(check_time, 4),
+            "protection": "Медленная работа защищает от перебора"
+        })
+    
+    return results
+
+def demonstrate_bcrypt_salt_auto():
+    """Демонстрация автоматической работы с солью в bcrypt"""
+    password = "my_password"
+    
+    # Генерируем несколько хэшей для одного пароля
+    hashes = []
+    for i in range(3):
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        hashes.append({
+            "attempt": i + 1,
+            "hash": hashed.decode('utf-8'),
+            "is_same": hashed == hashes[0]['hash'] if hashes else False
+        })
+    
+    return {
+        "original_password": password,
+        "hashes": hashes,
+        "explanation": "Bcrypt автоматически генерирует уникальную соль для каждого хэша"
+    }
+
+# Функция для сравнения разных алгоритмов хэширования
+def compare_hashing_algorithms():
+    """Сравнение скорости разных алгоритмов хэширования"""
+    import time
+    import hashlib
+    
+    password = "test_password_123"
+    results = []
+    
+    # MD5 (очень быстрый, небезопасный)
+    start = time.time()
+    for _ in range(10000):
+        hashlib.md5(password.encode()).hexdigest()
+    md5_time = time.time() - start
+    
+    # SHA256 (быстрый, не для паролей)
+    start = time.time()
+    for _ in range(10000):
+        hashlib.sha256(password.encode()).hexdigest()
+    sha256_time = time.time() - start
+    
+    # Bcrypt (медленный, безопасный для паролей)
+    start = time.time()
+    for _ in range(10):  # Меньше итераций из-за медленной скорости
+        bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    bcrypt_time = time.time() - start
+    
+    return {
+        "md5": {
+            "iterations": 10000,
+            "total_time": round(md5_time, 4),
+            "time_per_hash": round(md5_time / 10000, 6),
+            "security": "НЕБЕЗОПАСНО для паролей"
+        },
+        "sha256": {
+            "iterations": 10000,
+            "total_time": round(sha256_time, 4),
+            "time_per_hash": round(sha256_time / 10000, 6),
+            "security": "НЕБЕЗОПАСНО для паролей"
+        },
+        "bcrypt": {
+            "iterations": 10,
+            "total_time": round(bcrypt_time, 4),
+            "time_per_hash": round(bcrypt_time / 10, 4),
+            "security": "БЕЗОПАСНО для паролей"
+        }
+    }
