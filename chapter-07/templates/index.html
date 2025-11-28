@@ -3,7 +3,7 @@
 {% block title %}Симуляция стека{% endblock %}
 
 {% block content %}
-<h1>Симуляция стека</h1>
+<h1>Привет, {{ user|capitalize }}</h1>
 
 <div>
     <h3>Добавить элемент (Push)</h3>
@@ -27,6 +27,7 @@
 </div>
 
 <div id="result">Результат операции появится здесь</div>
+<div id="stack">{{ stack|join("<-") }}</div>
 
 <script>
     const API_BASE = '/services';
