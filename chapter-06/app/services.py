@@ -1,0 +1,40 @@
+from sqlalchemy import select, delete, func
+from database import async_session_maker, Stack
+
+# PUSH - добавление элемента в стек
+async def push(value: int):
+    async with async_session_maker() as session:
+        new_item = Stack(value=value)
+        session.add(new_item)
+        await session.commit()
+        return new_item.id
+
+# POP - извлечение верхнего элемента из стека
+async def pop():
+    async with async_session_maker() as session:
+        stmt = select(Stack).order_by(Stack.id.desc()).limit(1)
+        result = await session.execute(stmt)
+        top_item = result.scalar_one_or_none()
+        
+        if top_item:
+            value = top_item.value
+            await session.delete(top_item)
+            await session.commit()
+            return value
+        return None
+
+# DELETE - удаление всех элементов из стека
+async def delete_all():
+    async with async_session_maker() as session:
+        stmt = delete(Stack)
+        await session.execute(stmt)
+        await session.commit()
+        return True
+
+# GET_SIZE - получение размера стека
+async def get_size():
+    async with async_session_maker() as session:
+        stmt = select(func.count(Stack.id))
+        result = await session.execute(stmt)
+        size = result.scalar()
+        return size

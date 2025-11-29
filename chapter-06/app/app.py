@@ -1,11 +1,10 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import services
 
 
 app = FastAPI()
-
-stack = list()
 
 class PushElement(BaseModel):
     value: int
@@ -13,26 +12,27 @@ class PushElement(BaseModel):
 
 @app.get('/pop')
 async def pop_element():
-    if not stack:
+    if await services.get_size() <= 0:
         raise HTTPException(status_code=404, detail="No elements in stack")
     
-    return {"message": f"The last value is {stack.pop()}"}
+    return {"message": f"The last value is {await services.pop()}"}
 
 @app.post('/push')
 async def push_element(input: PushElement):
-    stack.append(input.value)
+    await services.push(input.value)
     return {"message": f"{input.value} is added"}
 
 @app.get('/size')
 async def get_stack_size():
+    length = await services.get_size()
     return {
-        "stack_size": len(stack),
-        "is_empty": len(stack) == 0
+        "stack_size": length,
+        "is_empty": length == 0
     }
 
 @app.delete('/clear')
-def clear_stack():
-    stack.clear()
+async def clear_stack():
+    await services.delete_all()
     return {"message": "Стек очищен"}
 
 if __name__ == "__main__":
