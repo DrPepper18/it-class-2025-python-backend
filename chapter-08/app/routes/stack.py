@@ -1,4 +1,4 @@
-from fastapi import HTTPException, APIRouter, HTTPBearer, Depends
+from fastapi import HTTPException, APIRouter, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from models import User
@@ -11,7 +11,7 @@ class PushElement(BaseModel):
     value: int
 
 
-router = APIRouter(pref="/stack")
+router = APIRouter(prefix="/stack")
 security = HTTPBearer()
 
 
@@ -39,7 +39,7 @@ async def pop_element(current_user: User = Depends(get_current_user)):
     if await services.stack.get_size(user_id) <= 0:
         raise HTTPException(status_code=404, detail="No elements in stack")
     
-    value = await services.pop(user_id)
+    value = await services.stack.pop(user_id)
     return {"message": f"The last value is {value}"}
 
 
